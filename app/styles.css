@@ -333,7 +333,7 @@ button:active:not(:disabled) { transform: scale(0.96); }
 
 /* ---------- custom background ---------- */
 .wallpaper {
-  position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; background-repeat: no-repeat;
+  position: absolute; inset: 0; z-index: -1; background-size: cover; background-position: center; background-repeat: no-repeat;
   animation: fade 0.5s ease-out;
 }
 /* a soft blue wash keeps the white labels readable over any picture */
