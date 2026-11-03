@@ -14,6 +14,7 @@ export function defaultBoard() {
     name: 'KanFlash',
     rev: 0,
     nextId: 1,
+    background: null, // version stamp of data/background.jpg, or null
     columns: [
       { id: 'todo', title: 'To do', cards: [] },
       { id: 'doing', title: 'In progress', cards: [] },
@@ -31,6 +32,7 @@ export function normalize(raw) {
     name: String(b.name || 'KanFlash'),
     rev: Number.isInteger(b.rev) ? b.rev : 0,
     nextId: 1,
+    background: Number.isFinite(b.background) ? b.background : null,
     columns: [],
   };
   let maxId = 0;

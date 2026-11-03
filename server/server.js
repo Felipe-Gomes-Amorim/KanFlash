@@ -17,11 +17,29 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
+const BG_FILE = path.join(path.dirname(BOARD_FILE), 'background.jpg');
+const BG_MAX = 15 * 1024 * 1024;
 const clients = new Set();
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(body));
+}
+
+function readBinary(req, max) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > max) {
+        reject(Object.assign(new Error('Image is too large'), { status: 413 }));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
 }
 
 function readBody(req) {
@@ -51,6 +69,27 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/api/background') {
+      if (req.method === 'GET') {
+        if (!fs.existsSync(BG_FILE)) return json(res, 404, { error: 'No background set' });
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
+        return fs.createReadStream(BG_FILE).pipe(res);
+      }
+      if (req.method === 'PUT') {
+        const buf = await readBinary(req, BG_MAX);
+        // only JPEG is accepted (the UI crops and exports JPEG), checked by its magic bytes
+        if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) return json(res, 400, { error: 'Only JPEG images are accepted' });
+        fs.mkdirSync(path.dirname(BG_FILE), { recursive: true });
+        fs.writeFileSync(BG_FILE, buf);
+        return json(res, 200, { v: Date.now() });
+      }
+      if (req.method === 'DELETE') {
+        fs.rmSync(BG_FILE, { force: true });
+        return json(res, 200, { ok: true });
+      }
+      return json(res, 405, { error: 'Method not allowed' });
+    }
+
     if (url.pathname === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('retry: 1000\n\n');
@@ -76,7 +115,7 @@ const server = http.createServer(async (req, res) => {
     });
     fs.createReadStream(file).pipe(res);
   } catch (e) {
-    json(res, 500, { error: e.message });
+    json(res, e.status || 500, { error: e.message });
   }
 });
 

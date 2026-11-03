@@ -191,7 +191,7 @@ function Clock() {
 
 // ---------- start menu ----------
 
-function StartMenu({ board, update, reload, onOpenCard, onClose }) {
+function StartMenu({ board, update, reload, onOpenCard, onBackground, onClose }) {
   const [q, setQ] = useState('');
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose();
@@ -266,6 +266,15 @@ function StartMenu({ board, update, reload, onOpenCard, onClose }) {
               }}
             />
           </div>
+          <button
+            className="start-btn"
+            onClick={() => {
+              onBackground();
+              onClose();
+            }}
+          >
+            Change background…
+          </button>
           <button
             className="start-btn"
             onClick={() => {
@@ -397,6 +406,275 @@ function CardModal({ board, cardId, update, onClose: finish }) {
   );
 }
 
+// ---------- background picker + cropper ----------
+
+const ASPECTS = [
+  { id: 'screen', label: 'Screen' },
+  { id: '16:9', label: '16:9', value: 16 / 9 },
+  { id: '21:9', label: '21:9', value: 21 / 9 },
+  { id: '4:3', label: '4:3', value: 4 / 3 },
+  { id: 'free', label: 'Free', value: null },
+];
+const MIN_CROP = 48;
+const MAX_OUTPUT = 2560; // longest side of the exported image, in pixels
+
+const aspectValue = (id) => (id === 'screen' ? window.innerWidth / window.innerHeight : ASPECTS.find((a) => a.id === id).value);
+
+function CropEditor({ file, busy, onBack, onApply }) {
+  const [img, setImg] = useState(null);
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  const [aspectId, setAspectId] = useState('screen');
+  const [rect, setRect] = useState(null); // in stage (display) pixels
+  const stage = useRef(null);
+  const drag = useRef(null);
+
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    const i = new Image();
+    i.onload = () => setImg(i);
+    i.onerror = () => setError('This file could not be read as an image.');
+    i.src = u;
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  // the image is shown scaled down to fit this box
+  const view = useMemo(() => {
+    if (!img) return null;
+    const maxW = Math.min(600, window.innerWidth - 100);
+    const maxH = Math.max(200, Math.min(340, window.innerHeight - 320));
+    const s = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+    return { s, w: Math.round(img.naturalWidth * s), h: Math.round(img.naturalHeight * s) };
+  }, [img]);
+
+  // (re)start with a centered frame whenever the image or the ratio changes
+  useEffect(() => {
+    if (!view) return;
+    const a = aspectValue(aspectId);
+    let w;
+    let h;
+    if (a) {
+      w = view.w;
+      h = w / a;
+      if (h > view.h) {
+        h = view.h;
+        w = h * a;
+      }
+      w *= 0.92;
+      h *= 0.92;
+    } else {
+      w = view.w * 0.8;
+      h = view.h * 0.8;
+    }
+    setRect({ x: (view.w - w) / 2, y: (view.h - h) / 2, w, h });
+  }, [view, aspectId]);
+
+  const point = (e) => {
+    const r = stage.current.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  const startDrag = (e, mode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    stage.current.setPointerCapture(e.pointerId);
+    drag.current = { mode, start: rect, p0: point(e) };
+  };
+
+  const onMove = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const p = point(e);
+    if (d.mode === 'move') {
+      setRect({
+        ...d.start,
+        x: clamp(d.start.x + p.x - d.p0.x, 0, view.w - d.start.w),
+        y: clamp(d.start.y + p.y - d.p0.y, 0, view.h - d.start.h),
+      });
+      return;
+    }
+    // resizing from a corner: the opposite corner stays put
+    const right = d.mode.includes('e');
+    const bottom = d.mode.includes('s');
+    const ax = right ? d.start.x : d.start.x + d.start.w;
+    const ay = bottom ? d.start.y : d.start.y + d.start.h;
+    const dx = right ? 1 : -1;
+    const dy = bottom ? 1 : -1;
+    const maxW = dx > 0 ? view.w - ax : ax;
+    const maxH = dy > 0 ? view.h - ay : ay;
+    let w = Math.max(MIN_CROP, dx * (p.x - ax));
+    let h = Math.max(MIN_CROP, dy * (p.y - ay));
+    const a = aspectValue(aspectId);
+    if (a) {
+      w = Math.max(w, h * a);
+      w = Math.max(MIN_CROP, Math.min(w, maxW, maxH * a));
+      h = w / a;
+    } else {
+      w = Math.min(w, maxW);
+      h = Math.min(h, maxH);
+    }
+    setRect({ x: dx > 0 ? ax : ax - w, y: dy > 0 ? ay : ay - h, w, h });
+  };
+
+  const endDrag = () => (drag.current = null);
+
+  // output size in real pixels (capped so the file stays reasonably small)
+  const out = useMemo(() => {
+    if (!view || !rect) return null;
+    const sw = rect.w / view.s;
+    const sh = rect.h / view.s;
+    const k = Math.min(1, MAX_OUTPUT / Math.max(sw, sh));
+    return { sx: rect.x / view.s, sy: rect.y / view.s, sw, sh, w: Math.round(sw * k), h: Math.round(sh * k) };
+  }, [view, rect]);
+
+  const apply = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = out.w;
+    canvas.height = out.h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0d3fa8'; // shows through transparent PNGs, since JPEG has no alpha
+    ctx.fillRect(0, 0, out.w, out.h);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, out.sx, out.sy, out.sw, out.sh, 0, 0, out.w, out.h);
+    canvas.toBlob((b) => (b ? onApply(b) : setError('Could not export the image.')), 'image/jpeg', 0.88);
+  };
+
+  return (
+    <div className="crop">
+      <div className="seg" role="group" aria-label="Aspect ratio">
+        {ASPECTS.map((a) => (
+          <button key={a.id} className={aspectId === a.id ? 'on' : ''} aria-pressed={aspectId === a.id} onClick={() => setAspectId(a.id)}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+
+      {error ? (
+        <p className="crop-error">{error}</p>
+      ) : !view ? (
+        <p className="hint">Loading image…</p>
+      ) : (
+        <div
+          ref={stage}
+          className="crop-stage"
+          style={{ width: view.w, height: view.h }}
+          onPointerMove={onMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
+          <img src={url} alt="" draggable={false} />
+          {rect && (
+            <div className="crop-rect" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }} onPointerDown={(e) => startDrag(e, 'move')}>
+              {['nw', 'ne', 'sw', 'se'].map((c) => (
+                <i key={c} className={'crop-h ' + c} onPointerDown={(e) => startDrag(e, c)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="hint">
+        Drag the frame to move it and a corner to resize it.{out && ` The background will be ${out.w} × ${out.h}.`}
+      </p>
+
+      <div className="dialog-foot">
+        <button className="secondary" onClick={onBack} disabled={busy}>Choose another</button>
+        <button className="primary" onClick={apply} disabled={busy || !out || !!error}>{busy ? 'Saving…' : 'Set as background'}</button>
+      </div>
+    </div>
+  );
+}
+
+function BackgroundDialog({ current, onSave, onRemove, onClose: finish }) {
+  const [closing, setClosing] = useState(false);
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [hover, setHover] = useState(false);
+  const input = useRef(null);
+  const onClose = () => (calm() ? finish() : setClosing(true));
+
+  useEffect(() => {
+    const h = (e) => e.key === 'Escape' && document.activeElement === document.body && onClose();
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+
+  const take = (f) => {
+    if (!f) return;
+    if (!f.type.startsWith('image/')) return setError('Please choose an image file (JPG, PNG, WebP…).');
+    if (f.size > 40 * 1024 * 1024) return setError('That image is larger than 40 MB.');
+    setError('');
+    setFile(f);
+  };
+
+  const run = async (fn) => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+      onClose();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={'overlay' + (closing ? ' closing' : '')} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div
+        className="dialog wide"
+        role="dialog"
+        aria-label="Background"
+        onAnimationEnd={(e) => closing && e.target === e.currentTarget && finish()}
+      >
+        <div className="dialog-bar">
+          <span className="dialog-title">Background</span>
+          <button className="win-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="dialog-body">
+          {file ? (
+            <CropEditor file={file} busy={busy} onBack={() => setFile(null)} onApply={(blob) => run(() => onSave(blob))} />
+          ) : (
+            <>
+              <div
+                className={'drop' + (hover ? ' over' : '')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setHover(true);
+                }}
+                onDragLeave={() => setHover(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setHover(false);
+                  take(e.dataTransfer.files[0]);
+                }}
+              >
+                <b>Drop an image here</b>
+                <span>or</span>
+                <button className="primary" onClick={() => input.current.click()}>Choose image…</button>
+                <input ref={input} type="file" accept="image/*" hidden onChange={(e) => take(e.target.files[0])} />
+              </div>
+              <p className="hint">You will be able to crop it before it is applied.</p>
+              {current && (
+                <>
+                  <h4>Current background</h4>
+                  <img className="bg-preview" src={`/api/background?v=${current}`} alt="Current background" />
+                  <div className="dialog-foot">
+                    <button className="danger" disabled={busy} onClick={() => run(onRemove)}>Remove background</button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          {error && <p className="crop-error">{error}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- app ----------
 
 export default function App() {
@@ -404,6 +682,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [openCard, setOpenCard] = useState(null);
   const [menu, setMenu] = useState(false);
+  const [bgOpen, setBgOpen] = useState(false);
   const [focusCol, setFocusCol] = useState(null);
   const [over, setOver] = useState(null); // {type:'card', col, index} | {type:'col', index}
   const [dragging, setDragging] = useState(null); // {type, id, w, h}
@@ -486,6 +765,24 @@ export default function App() {
   }, [board]);
 
   if (!board) return <div className="center">{error || 'Loading…'}</div>;
+
+  // uploads the cropped JPEG, then records its version stamp on the board
+  const saveBackground = async (blob) => {
+    const r = await fetch('/api/background', { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: blob });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Failed to save the background');
+    update((b) => {
+      b.background = data.v;
+    });
+  };
+
+  const removeBackground = async () => {
+    const r = await fetch('/api/background', { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed to remove the background');
+    update((b) => {
+      b.background = null;
+    });
+  };
 
   const jumpTo = (id) => {
     setFocusCol(id);
@@ -676,6 +973,13 @@ export default function App() {
 
   return (
     <div className="desk">
+      {board.background && (
+        <div
+          key={board.background}
+          className="wallpaper"
+          style={{ backgroundImage: `url(/api/background?v=${board.background})` }}
+        />
+      )}
       <div className="window">
         <div className="titlebar">
           <span className="app-icon"><Orb /></span>
@@ -685,6 +989,13 @@ export default function App() {
             <span className="chip"><i className="coin blue" />Cards <b key={stats.total} className="bump">{stats.total}</b></span>
             <span className="chip"><i className="coin pink" />Columns <b key={board.columns.length} className="bump">{board.columns.length}</b></span>
           </div>
+          <button className="tb-btn" title="Change background" aria-label="Change background" onClick={() => setBgOpen(true)}>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
+              <path d="M4 18l5.5-5.5 3.5 3.5 2.5-2.5L20 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
 
         <div className="window-body">
@@ -847,7 +1158,22 @@ export default function App() {
       </footer>
 
       {menu && (
-        <StartMenu board={board} update={update} reload={reload} onOpenCard={setOpenCard} onClose={() => setMenu(false)} />
+        <StartMenu
+          board={board}
+          update={update}
+          reload={reload}
+          onOpenCard={setOpenCard}
+          onBackground={() => setBgOpen(true)}
+          onClose={() => setMenu(false)}
+        />
+      )}
+      {bgOpen && (
+        <BackgroundDialog
+          current={board.background}
+          onSave={saveBackground}
+          onRemove={removeBackground}
+          onClose={() => setBgOpen(false)}
+        />
       )}
       {openCard !== null && (
         <CardModal board={board} cardId={openCard} update={update} onClose={() => setOpenCard(null)} />

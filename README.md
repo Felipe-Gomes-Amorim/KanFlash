@@ -4,6 +4,7 @@ A local kanban board for your projects, editable by you (in the browser) and by 
 Everything lives in a single `board.json` file: no database, no external service.
 
 - **Web UI**: columns, drag & drop for cards and columns, card descriptions and checklists, search. Styled after Windows 7 Aero glass.
+- **Custom background**: pick any image and crop it (screen, 16:9, 21:9, 4:3 or free ratio) before it is applied.
 - **CLI**: `kanflash add`, `move`, `done`, `check`… so an AI agent can read and update the board while it works.
 - **Drops into any project** as a hidden folder that never reaches the project's remote.
 - **Live sync**: the page updates by itself when the board file changes, and the other way around.
@@ -47,7 +48,7 @@ node .kanflash/bin/kanflash.js help             # every command
 | UI | `app/` (React + Vite) | drag cards and columns, descriptions, checklists |
 | Instructions | `templates/instructions.md` | the rules your project's AI follows |
 
-Each project gets its own `data/board.json`. To keep the board somewhere else, set `KANFLASH_BOARD=/path/to/board.json`.
+Each project gets its own `data/board.json` (and `data/background.jpg` if you set a background). To keep the board somewhere else, set `KANFLASH_BOARD=/path/to/board.json`.
 
 ## Development
 
