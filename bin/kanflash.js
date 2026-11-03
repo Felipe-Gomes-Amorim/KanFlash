@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // KanFlash CLI. Built to be used by people and by the project's AI alike.
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
   loadBoard, saveBoard, findCard, findColumn,
   addCard, moveCard, editCard, removeCard,
   addItem, setItemDone, removeItem,
   addColumn, renameColumn, removeColumn, moveColumn, setColumnLimit, nextCard,
-  PRIORITY_LABEL, BOARD_FILE,
+  PRIORITY_LABEL, BOARD_FILE, ROOT,
 } from '../core/board.js';
 
 const HELP = `KanFlash - a kanban board for you and your AI
@@ -38,6 +41,7 @@ Columns
 
 Server
   kanflash serve [--port 4545] [--open]       open the web UI
+  kanflash update                             download the latest KanFlash (your board and background are kept)
 
 <id> accepts "3" or "#3". <column> accepts the column name or id.
 <p> is a MoSCoW priority: must, should, could or wont. Put flags after the other arguments.
@@ -102,6 +106,19 @@ async function main() {
   const { pos, flags } = parse(rest);
 
   if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') return console.log(HELP);
+
+  if (cmd === 'update') {
+    // only for an installed copy (<project>/.kanflash); a development clone should use git pull
+    if (fs.existsSync(path.join(ROOT, '.git')) || path.basename(ROOT) === 'KanFlash') {
+      throw new Error('This looks like the KanFlash repository itself. Use "git pull" here; "update" is for copies installed inside a project.');
+    }
+    const run = (c) => spawnSync(c, { cwd: ROOT, stdio: 'inherit', shell: true });
+    console.log('Downloading the latest KanFlash…');
+    if (run('npx --yes degit --force Felipe-Gomes-Amorim/KanFlash .').status !== 0) throw new Error('Download failed.');
+    if (run('node scripts/setup.js').status !== 0) throw new Error('Setup failed.');
+    console.log('\nUpdated. Restart the KanFlash server if it is running.');
+    return;
+  }
 
   if (cmd === 'serve') {
     if (flags.port) process.env.PORT = String(flags.port);

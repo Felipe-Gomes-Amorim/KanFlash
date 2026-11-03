@@ -32,14 +32,11 @@ if (path.basename(ROOT) === 'KanFlash' && !has('--force')) {
 if (!has('--no-build')) {
   // one command string + shell: works on Windows (npm.cmd) without Node's args-with-shell warning
   const run = (a) => spawnSync(`npm ${a.join(' ')}`, { cwd: ROOT, stdio: 'inherit', shell: true });
-  if (!fs.existsSync(path.join(ROOT, 'node_modules'))) {
-    log('Installing dependencies…');
-    if (run(['install', '--no-audit', '--no-fund']).status !== 0) process.exit(1);
-  }
-  if (!fs.existsSync(path.join(ROOT, 'dist'))) {
-    log('Building the site…');
-    if (run(['run', 'build']).status !== 0) process.exit(1);
-  }
+  // always rebuild: on an update the dependencies and the site may have changed
+  log('Installing dependencies…');
+  if (run(['install', '--no-audit', '--no-fund']).status !== 0) process.exit(1);
+  log('Building the site…');
+  if (run(['run', 'build']).status !== 0) process.exit(1);
 }
 
 // 2. hide from the project's git

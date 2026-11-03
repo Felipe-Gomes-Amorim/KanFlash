@@ -30,6 +30,14 @@ Options: `--file AGENTS.md` (another instructions file, e.g. for Codex or Cursor
 
 No `degit`? `git clone --depth 1 https://github.com/Felipe-Gomes-Amorim/KanFlash .kanflash && rm -rf .kanflash/.git` does the same.
 
+## Update
+
+```bash
+node .kanflash/bin/kanflash.js update
+```
+
+This downloads the latest version over the installed one, rebuilds the site and refreshes the AI instructions. Your board (`data/board.json`) and background are kept. Restart the server afterwards if it was running.
+
 ## Use
 
 ```bash
