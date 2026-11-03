@@ -30,8 +30,8 @@ if (path.basename(ROOT) === 'KanFlash' && !has('--force')) {
 
 // 1. build
 if (!has('--no-build')) {
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const run = (a) => spawnSync(npm, a, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  // one command string + shell: works on Windows (npm.cmd) without Node's args-with-shell warning
+  const run = (a) => spawnSync(`npm ${a.join(' ')}`, { cwd: ROOT, stdio: 'inherit', shell: true });
   if (!fs.existsSync(path.join(ROOT, 'node_modules'))) {
     log('Installing dependencies…');
     if (run(['install', '--no-audit', '--no-fund']).status !== 0) process.exit(1);
