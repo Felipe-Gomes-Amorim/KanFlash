@@ -23,6 +23,10 @@ const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 
+// MoSCoW priorities, most to least urgent (same keys as core/board.js).
+const PRIORITY_KEYS = ['must', 'should', 'could', 'wont'];
+const PRIORITY_LABEL = { must: 'Must', should: 'Should', could: 'Could', wont: "Won't" };
+
 // Tilt (in degrees) applied to a lifted item, by kind.
 const LIFT_TILT = { card: 2, col: 1 };
 
@@ -186,6 +190,72 @@ function Clock() {
       <b>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b>
       <span>{now.toLocaleDateString()}</span>
     </div>
+  );
+}
+
+// Column counter. When the column has a work-in-progress limit it reads "2/3"
+// and turns red once exceeded. Clicking it opens a small editor for the limit.
+function WipBadge({ col, onSet }) {
+  const [open, setOpen] = useState(false);
+  const [v, setV] = useState('');
+  const ref = useRef(null);
+  const count = col.cards.length;
+  const over = !!col.wip && count > col.wip;
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    window.addEventListener('mousedown', h);
+    return () => window.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const save = (n) => {
+    onSet(n);
+    setOpen(false);
+  };
+  const submit = () => {
+    const n = parseInt(v, 10);
+    save(Number.isInteger(n) && n > 0 ? n : null);
+  };
+
+  return (
+    <span className="wip" ref={ref}>
+      <button
+        key={count}
+        className={'count bump' + (col.wip ? ' limited' : '') + (over ? ' over' : '')}
+        title={col.wip ? `Limit: ${col.wip} at a time${over ? ' (exceeded)' : ''}. Click to change.` : 'Click to set a work-in-progress limit'}
+        aria-label={col.wip ? `${count} of ${col.wip} cards. Change the limit` : `${count} cards. Set a limit`}
+        onClick={() => {
+          setV(col.wip ? String(col.wip) : '');
+          setOpen((o) => !o);
+        }}
+      >
+        {count}{col.wip ? `/${col.wip}` : ''}
+      </button>
+      {open && (
+        <div className="wip-pop" role="dialog" aria-label="Work-in-progress limit">
+          <label>
+            Max cards at once
+            <input
+              type="number"
+              min="1"
+              autoFocus
+              placeholder="No limit"
+              value={v}
+              onChange={(e) => setV(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submit();
+                if (e.key === 'Escape') setOpen(false);
+              }}
+            />
+          </label>
+          <div className="wip-actions">
+            <button className="primary sm" onClick={submit}>Set</button>
+            <button className="secondary sm" onClick={() => save(null)}>No limit</button>
+          </div>
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -355,6 +425,20 @@ function CardModal({ board, cardId, update, onClose: finish }) {
               </select>
             </label>
             <span>Created {new Date(card.createdAt).toLocaleDateString()}</span>
+          </div>
+
+          <h4>Priority</h4>
+          <div className="seg prio" role="group" aria-label="Priority">
+            {[null, ...PRIORITY_KEYS].map((p) => (
+              <button
+                key={p || 'none'}
+                className={'p-' + (p || 'none') + ((card.priority || null) === p ? ' on' : '')}
+                aria-pressed={(card.priority || null) === p}
+                onClick={() => patch((k) => (k.priority = p))}
+              >
+                {p ? PRIORITY_LABEL[p] : 'None'}
+              </button>
+            ))}
           </div>
 
           <h4>Description</h4>
@@ -1035,7 +1119,7 @@ export default function App() {
                 <button key={col.id} onClick={() => jumpTo(col.id)}>
                   <span className={'dot ' + tone(i)} />
                   <span className="grow">{col.title}</span>
-                  <span key={col.cards.length} className="num bump">{col.cards.length}</span>
+                  <span key={col.cards.length} className={'num bump' + (col.wip && col.cards.length > col.wip ? ' over' : '')}>{col.cards.length}{col.wip ? `/${col.wip}` : ''}</span>
                 </button>
               ))}
             </nav>
@@ -1064,7 +1148,7 @@ export default function App() {
                         aria-label="Column name"
                         onCommit={(v) => v.trim() && update((b) => (b.columns.find((c) => c.id === col.id).title = v.trim()))}
                       />
-                      <span key={col.cards.length} className="count bump">{col.cards.length}</span>
+                      <WipBadge col={col} onSet={(n) => update((b) => (b.columns.find((c) => c.id === col.id).wip = n))} />
                       <button
                         className="x"
                         title="Delete column"
@@ -1093,6 +1177,7 @@ export default function App() {
                             >
                               <div className="card-title">{card.title}</div>
                               <div className="card-meta">
+                                {card.priority && <span className={'prio-badge ' + card.priority}>{PRIORITY_LABEL[card.priority]}</span>}
                                 <span>#{card.id}</span>
                                 {card.description && <span title="Has a description">☰</span>}
                                 {card.checklist.length > 0 && (

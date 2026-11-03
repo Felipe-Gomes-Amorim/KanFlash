@@ -25,6 +25,29 @@ export function defaultBoard() {
 
 const now = () => new Date().toISOString();
 
+// MoSCoW priorities, from most to least urgent.
+export const PRIORITIES = ['must', 'should', 'could', 'wont'];
+export const PRIORITY_LABEL = { must: 'Must', should: 'Should', could: 'Could', wont: "Won't" };
+
+/** 'must' | 'should' | 'could' | 'wont' (aliases accepted) -> key; '', 'none' or undefined -> null. */
+export function parsePriority(v) {
+  if (v === undefined || v === null || v === true) return null;
+  const k = String(v).trim().toLowerCase().replace(/[^a-z]/g, '');
+  if (!k || k === 'none' || k === 'clear') return null;
+  if (PRIORITIES.includes(k)) return k;
+  throw new Error(`Invalid priority "${v}". Use: must, should, could, wont, or none.`);
+}
+
+/** Positive integer -> number; '', 'none', 0 or undefined -> null (no limit). */
+export function parseLimit(v) {
+  if (v === undefined || v === null || v === true) return null;
+  const k = String(v).trim().toLowerCase();
+  if (!k || k === 'none' || k === 'off' || k === '0') return null;
+  const n = Number(k);
+  if (!Number.isInteger(n) || n < 1) throw new Error(`Invalid limit "${v}". Use a whole number of 1 or more, or "none".`);
+  return n;
+}
+
 export function normalize(raw) {
   const b = raw && typeof raw === 'object' ? raw : {};
   const board = {
@@ -41,7 +64,7 @@ export function normalize(raw) {
     let id = String(c.id || '');
     if (!id || seenCols.has(id)) id = 'c' + Math.random().toString(36).slice(2, 7);
     seenCols.add(id);
-    const col = { id, title: String(c.title || 'Untitled'), cards: [] };
+    const col = { id, title: String(c.title || 'Untitled'), wip: Number.isInteger(c.wip) && c.wip > 0 ? c.wip : null, cards: [] };
     for (const k of Array.isArray(c.cards) ? c.cards : []) {
       const id = Number(k.id);
       if (!Number.isInteger(id) || id < 1) continue;
@@ -50,6 +73,7 @@ export function normalize(raw) {
         id,
         title: String(k.title || 'Untitled'),
         description: String(k.description || ''),
+        priority: PRIORITIES.includes(k.priority) ? k.priority : null,
         checklist: (Array.isArray(k.checklist) ? k.checklist : []).map((i, n) => ({
           id: Number.isInteger(i.id) ? i.id : n + 1,
           text: String(i.text || ''),
@@ -134,7 +158,7 @@ export function findCard(board, ref) {
 
 // ---------- operations (they mutate the in-memory board) ----------
 
-export function addCard(board, { title, description = '', column, checklist = [] }) {
+export function addCard(board, { title, description = '', column, checklist = [], priority }) {
   if (!title || !String(title).trim()) throw new Error('A card needs a title.');
   const col = column ? findColumn(board, column) : board.columns[0];
   if (!col) throw new Error('The board has no columns.');
@@ -142,6 +166,7 @@ export function addCard(board, { title, description = '', column, checklist = []
     id: board.nextId++,
     title: String(title).trim(),
     description,
+    priority: parsePriority(priority),
     checklist: checklist.map((text, i) => ({ id: i + 1, text: String(text), done: false })),
     createdAt: now(),
     updatedAt: now(),
@@ -150,9 +175,14 @@ export function addCard(board, { title, description = '', column, checklist = []
   return card;
 }
 
-export function moveCard(board, ref, columnRef, position) {
+export function moveCard(board, ref, columnRef, position, { force = false } = {}) {
   const { card, col, idx } = findCard(board, ref);
   const target = findColumn(board, columnRef);
+  if (!force && target !== col && target.wip && target.cards.length >= target.wip) {
+    throw new Error(
+      `Column "${target.title}" is full (${target.cards.length}/${target.wip}). Finish or move something out first, or use --force if the user asked for it.`
+    );
+  }
   col.cards.splice(idx, 1);
   const pos = position === undefined ? target.cards.length : Math.max(0, Math.min(target.cards.length, position));
   target.cards.splice(pos, 0, card);
@@ -160,8 +190,9 @@ export function moveCard(board, ref, columnRef, position) {
   return { card, from: col, to: target };
 }
 
-export function editCard(board, ref, { title, description }) {
+export function editCard(board, ref, { title, description, priority }) {
   const { card } = findCard(board, ref);
+  if (priority !== undefined) card.priority = parsePriority(priority);
   if (title !== undefined) card.title = String(title);
   if (description !== undefined) card.description = String(description);
   card.updatedAt = now();
@@ -208,12 +239,27 @@ export function removeItem(board, ref, itemRef) {
   return { card, item };
 }
 
-export function addColumn(board, title) {
+/** The card to pick up next: highest priority in the first column (cards marked "won't" are skipped). */
+export function nextCard(board) {
+  const col = board.columns[0];
+  if (!col) return null;
+  const rank = (c) => (c.priority ? PRIORITIES.indexOf(c.priority) : 2.5);
+  const cards = col.cards.filter((c) => c.priority !== 'wont').sort((a, b) => rank(a) - rank(b) || a.id - b.id);
+  return cards.length ? { card: cards[0], col } : null;
+}
+
+export function setColumnLimit(board, ref, limit) {
+  const col = findColumn(board, ref);
+  col.wip = parseLimit(limit);
+  return col;
+}
+
+export function addColumn(board, title, limit) {
   if (!title || !String(title).trim()) throw new Error('A column needs a name.');
   const base = norm(title).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'col';
   let id = base;
   for (let n = 2; board.columns.some((c) => c.id === id); n++) id = `${base}-${n}`;
-  const col = { id, title: String(title).trim(), cards: [] };
+  const col = { id, title: String(title).trim(), wip: parseLimit(limit), cards: [] };
   board.columns.push(col);
   return col;
 }

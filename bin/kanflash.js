@@ -4,8 +4,8 @@ import {
   loadBoard, saveBoard, findCard, findColumn,
   addCard, moveCard, editCard, removeCard,
   addItem, setItemDone, removeItem,
-  addColumn, renameColumn, removeColumn, moveColumn,
-  BOARD_FILE,
+  addColumn, renameColumn, removeColumn, moveColumn, setColumnLimit, nextCard,
+  PRIORITY_LABEL, BOARD_FILE,
 } from '../core/board.js';
 
 const HELP = `KanFlash - a kanban board for you and your AI
@@ -13,13 +13,14 @@ const HELP = `KanFlash - a kanban board for you and your AI
 Read
   kanflash list [--col <column>] [--json]     show the board
   kanflash show <id> [--json]                 show one card in full
+  kanflash next                               the card to pick up next (highest priority in the 1st column)
 
 Cards
-  kanflash add "title" [--col <column>] [--desc "text"] [--check "item"]...
-  kanflash move <id> <column> [--pos <n>]     (pos starts at 1)
-  kanflash start <id>                         move to the 2nd column
+  kanflash add "title" [--col <column>] [--desc "text"] [--check "item"]... [--priority <p>]
+  kanflash move <id> <column> [--pos <n>] [--force]   (pos starts at 1)
+  kanflash start <id> [--force]               move to the 2nd column
   kanflash done <id>                          move to the last column
-  kanflash edit <id> [--title "new"] [--desc "new"]
+  kanflash edit <id> [--title "new"] [--desc "new"] [--priority <p>|none]
   kanflash rm <id>
 
 Checklist
@@ -29,7 +30,8 @@ Checklist
   kanflash rm-item <id> <item#|text>
 
 Columns
-  kanflash col-add "name"
+  kanflash col-add "name" [--limit <n>]
+  kanflash col-limit <column> <n|none>        work-in-progress limit (moves into a full column are refused)
   kanflash col-rename <column> "new name"
   kanflash col-rm <column>                    (only if empty)
   kanflash col-move <column> <pos>            (pos starts at 1)
@@ -38,6 +40,7 @@ Server
   kanflash serve [--port 4545] [--open]       open the web UI
 
 <id> accepts "3" or "#3". <column> accepts the column name or id.
+<p> is a MoSCoW priority: must, should, could or wont. Put flags after the other arguments.
 Data file: ${BOARD_FILE}`;
 
 function parse(argv) {
@@ -62,14 +65,16 @@ function parse(argv) {
 function cardLine(c) {
   const total = c.checklist.length;
   const done = c.checklist.filter((i) => i.done).length;
-  return `#${c.id} ${c.title}${total ? `  [${done}/${total}]` : ''}${c.description ? '  …' : ''}`;
+  const prio = c.priority ? ` (${PRIORITY_LABEL[c.priority]})` : '';
+  return `#${c.id}${prio} ${c.title}${total ? `  [${done}/${total}]` : ''}${c.description ? '  …' : ''}`;
 }
 
 function printBoard(board, only) {
   console.log(`# ${board.name}`);
   const cols = only ? [findColumn(board, only)] : board.columns;
   for (const col of cols) {
-    console.log(`\n## ${col.title} (${col.cards.length})`);
+    const limit = col.wip ? `/${col.wip}${col.cards.length > col.wip ? ', over the limit' : ''}` : '';
+    console.log(`\n## ${col.title} (${col.cards.length}${limit})`);
     if (!col.cards.length) console.log('  (empty)');
     for (const c of col.cards) console.log('  ' + cardLine(c));
   }
@@ -78,6 +83,7 @@ function printBoard(board, only) {
 function printCard(card, col) {
   console.log(`#${card.id} ${card.title}`);
   console.log(`Column: ${col.title}`);
+  console.log(`Priority: ${card.priority ? PRIORITY_LABEL[card.priority] : '(none)'}`);
   console.log(`Description: ${card.description || '(none)'}`);
   if (card.checklist.length) {
     console.log('Checklist:');
@@ -118,12 +124,19 @@ async function main() {
       return flags.json ? console.log(JSON.stringify({ column: col.title, ...card }, null, 2)) : printCard(card, col);
     }
 
+    case 'next': {
+      const n = nextCard(board);
+      if (!n) return console.log(`Nothing to pick up in "${board.columns[0]?.title}" (empty, or only "won't do" cards).`);
+      return printCard(n.card, n.col);
+    }
+
     case 'add': {
       const card = addCard(board, {
         title: need(pos[0], 'Usage: kanflash add "title" [--col column]'),
         description: str(flags.desc) || '',
         column: str(flags.col) || undefined,
         checklist: flags.check || [],
+        priority: flags.priority,
       });
       save();
       const col = findCard(board, card.id).col;
@@ -132,7 +145,7 @@ async function main() {
 
     case 'move': {
       const position = flags.pos ? Number(flags.pos) - 1 : undefined;
-      const r = moveCard(board, need(pos[0], 'Usage: kanflash move <id> <column>'), need(pos[1], 'Missing column.'), position);
+      const r = moveCard(board, need(pos[0], 'Usage: kanflash move <id> <column>'), need(pos[1], 'Missing column.'), position, { force: !!flags.force });
       save();
       return console.log(`#${r.card.id} moved: "${r.from.title}" → "${r.to.title}"`);
     }
@@ -141,16 +154,17 @@ async function main() {
     case 'done': {
       const target = cmd === 'start' ? board.columns[1] : board.columns[board.columns.length - 1];
       if (!target) throw new Error('The target column does not exist.');
-      const r = moveCard(board, need(pos[0], `Usage: kanflash ${cmd} <id>`), target.id);
+      const r = moveCard(board, need(pos[0], `Usage: kanflash ${cmd} <id>`), target.id, undefined, { force: !!flags.force });
       save();
       return console.log(`#${r.card.id} moved: "${r.from.title}" → "${r.to.title}"`);
     }
 
     case 'edit': {
-      if (flags.title === undefined && flags.desc === undefined) throw new Error('Use --title and/or --desc.');
+      if (flags.title === undefined && flags.desc === undefined && flags.priority === undefined) throw new Error('Use --title, --desc and/or --priority.');
       const card = editCard(board, need(pos[0], 'Usage: kanflash edit <id> --title/--desc'), {
         title: flags.title === undefined ? undefined : str(flags.title),
         description: flags.desc === undefined ? undefined : str(flags.desc),
+        priority: flags.priority === undefined ? undefined : str(flags.priority),
       });
       save();
       return console.log(`Updated #${card.id}`);
@@ -183,9 +197,15 @@ async function main() {
     }
 
     case 'col-add': {
-      const col = addColumn(board, need(pos[0], 'Usage: kanflash col-add "name"'));
+      const col = addColumn(board, need(pos[0], 'Usage: kanflash col-add "name" [--limit n]'), flags.limit);
       save();
       return console.log(`Column created: ${col.title}`);
+    }
+
+    case 'col-limit': {
+      const col = setColumnLimit(board, need(pos[0], 'Usage: kanflash col-limit <column> <n|none>'), need(pos[1], 'Missing limit (a number or "none").'));
+      save();
+      return console.log(col.wip ? `Column "${col.title}" limit set to ${col.wip}.` : `Column "${col.title}" no longer has a limit.`);
     }
 
     case 'col-rename': {

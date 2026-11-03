@@ -408,3 +408,32 @@ button:active:not(:disabled) { transform: scale(0.96); }
 .secondary { padding: 7px 18px; border: 3px solid var(--cobalt); border-radius: 999px; background: #fff; color: var(--cobalt); font: 800 14px var(--display); }
 .secondary:hover { background: #e6edff; }
 button:disabled { opacity: 0.55; cursor: default; }
+
+/* ---------- priority (MoSCoW) and work-in-progress limits ---------- */
+.prio-badge { padding: 0 8px; border-radius: 999px; color: #fff; font: 800 11px/18px var(--display); }
+.prio-badge.must { background: #e0364f; }
+.prio-badge.should { background: #d98200; }
+.prio-badge.could { background: var(--blue); }
+.prio-badge.wont { background: #7d8ac4; }
+
+.seg.prio { margin: 0 6px 4px; }
+.seg.prio button.on.p-none { background: var(--ink); color: #fff; }
+.seg.prio button.on.p-must { background: #e0364f; color: #fff; }
+.seg.prio button.on.p-should { background: #d98200; color: #fff; }
+.seg.prio button.on.p-could { background: var(--blue); color: #fff; }
+.seg.prio button.on.p-wont { background: #7d8ac4; color: #fff; }
+
+.wip { position: relative; display: inline-flex; flex: none; }
+button.count { border: 0; cursor: pointer; color: #fff; }
+.count.limited { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--tone); }
+.count.over { background: #e0364f; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #e0364f; }
+.num.over { color: #e0364f; }
+.wip-pop {
+  position: absolute; top: calc(100% + 10px); right: -8px; z-index: 30; width: 210px; padding: 12px;
+  border-radius: 12px; background: #fff; border: 3px solid var(--cobalt); box-shadow: 0 10px 24px rgba(0, 20, 90, 0.45);
+  transform-origin: 90% 0; animation: rise 0.16s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.wip-pop label { display: flex; flex-direction: column; gap: 6px; font: 700 13px var(--display); }
+.wip-pop input { width: 100%; padding: 6px 8px; border: 2px solid var(--cobalt); border-radius: 8px; background: #fff; }
+.wip-actions { display: flex; gap: 6px; margin-top: 10px; }
+.primary.sm, .secondary.sm { padding: 3px 12px; border-width: 2px; font-size: 13px; }
