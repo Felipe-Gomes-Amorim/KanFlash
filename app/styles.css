@@ -35,32 +35,21 @@ button { cursor: pointer; }
 
 .center { display: grid; place-items: center; height: 100%; color: #fff; font-family: var(--display); }
 
-/* ---------- glass window ---------- */
-.desk { position: fixed; inset: 0; padding: 16px 16px 62px; }
-.window {
-  position: relative;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 0 8px 8px;
-  border-radius: 10px;
-  background: linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.18));
-  backdrop-filter: blur(22px) saturate(1.5);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+/* ---------- layout: floating header, side panel and columns ---------- */
+.desk { position: fixed; inset: 0; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.titlebar {
+  position: relative; flex: none; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 10px; overflow: hidden;
+  border-radius: 12px; background: linear-gradient(rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.18));
+  backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
   border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 0 0 1px rgba(0, 20, 90, 0.55), 0 22px 60px rgba(0, 20, 90, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 20, 90, 0.5), 0 10px 28px rgba(0, 20, 90, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-.window::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
+.titlebar::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(112deg, rgba(255, 255, 255, 0.26) 0 26%, transparent 26.2% 50%, rgba(255, 255, 255, 0.12) 50.2% 58%, transparent 58.2%);
 }
-.window > * { position: relative; }
-
-.titlebar { display: flex; align-items: center; gap: 10px; padding: 7px 4px; min-height: 40px; }
+.titlebar > * { position: relative; }
+.workspace { flex: 1; min-height: 0; display: flex; gap: 16px; }
 .app-icon {
   width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center;
   background: linear-gradient(#6fb4ff, var(--cobalt));
@@ -80,20 +69,14 @@ button { cursor: pointer; }
 .coin.blue { background: var(--blue); }
 .coin.pink { background: var(--pink); }
 
-.window-body {
-  flex: 1; min-height: 0; display: flex; gap: 8px;
-  padding: 8px; border-radius: 5px;
-  background: rgba(8, 40, 140, 0.3);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), inset 0 8px 24px rgba(0, 20, 90, 0.3);
-}
-
 /* ---------- left panel (grid paper) ---------- */
 .side {
+  margin-bottom: 72px; /* leaves room for the orb below */
   flex: 0 0 292px; display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow-y: auto;
   border-radius: 8px; background-color: var(--paper);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 20px 20px;
-  box-shadow: 0 0 0 1px rgba(0, 20, 90, 0.5), inset 0 0 0 2px #fff;
+  box-shadow: 0 0 0 1px rgba(0, 20, 90, 0.5), 0 10px 28px rgba(0, 20, 90, 0.35), inset 0 0 0 2px #fff;
 }
 .profile { display: flex; align-items: center; gap: 10px; }
 .avatar {
@@ -158,12 +141,12 @@ button { cursor: pointer; }
 .dot.amber { background: var(--amber); }
 
 /* ---------- columns ---------- */
-main { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding: 4px 4px 8px; }
+main { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding: 4px 6px 14px; }
 .column {
   --tone: var(--blue);
   flex: 0 0 292px; max-height: 100%; display: flex; flex-direction: column; position: relative; padding: 8px;
   border-radius: 12px; background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 22px rgba(0, 20, 90, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 .column.blue { --tone: var(--blue); }
@@ -214,33 +197,20 @@ main { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: flex-start;
 .add-btn.light:hover { background: #e6edff; }
 .add-btn.light .plus { background: var(--cobalt); color: #fff; }
 
-/* ---------- taskbar ---------- */
-.taskbar {
-  position: fixed; left: 0; right: 0; bottom: 0; height: 46px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 8px;
-  background: linear-gradient(rgba(70, 120, 210, 0.6), rgba(10, 35, 110, 0.78));
-  backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 -1px 0 rgba(0, 20, 90, 0.6);
-  z-index: 30;
-}
+/* ---------- start orb ---------- */
 .orb {
-  flex: none; width: 40px; height: 40px; margin-top: -6px; display: grid; place-items: center; padding: 0; border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  position: fixed; left: 18px; bottom: 16px; z-index: 30; width: 56px; height: 56px; display: grid; place-items: center; padding: 0; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
   background: radial-gradient(circle at 35% 22%, #b8ecff 0%, #3b92f0 48%, #0b3aa6 100%);
-  box-shadow: 0 0 12px rgba(120, 200, 255, 0.8), inset 0 -4px 8px rgba(0, 20, 120, 0.5);
+  box-shadow: 0 0 18px rgba(120, 200, 255, 0.85), 0 6px 14px rgba(0, 20, 90, 0.45), inset 0 -6px 10px rgba(0, 20, 120, 0.5);
 }
-.orb:hover, .orb.open { box-shadow: 0 0 20px #bfeaff, inset 0 -4px 8px rgba(0, 20, 120, 0.4); filter: brightness(1.12); }
-.tabs { display: flex; min-width: 0; overflow-x: auto; border-radius: 999px; background: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35), 0 2px 0 rgba(0, 20, 90, 0.4); }
-.tabs button { flex: none; padding: 5px 22px; border: 0; border-left: 1px solid #c9d4f3; background: transparent; font: 800 13px var(--display); color: var(--ink); }
-.tabs button:first-child { border-left: 0; }
-.tabs button:hover { background: #e6edff; }
-.tabs button.active { background: var(--cobalt); color: #fff; }
-.clock { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; color: #fff; font-size: 12px; line-height: 1.15; text-shadow: 0 1px 3px rgba(0, 20, 90, 0.8); }
-.clock b { font: 800 13px var(--display); }
+.orb svg { width: 30px; height: 30px; }
+.orb:hover, .orb.open { box-shadow: 0 0 26px #bfeaff, 0 6px 14px rgba(0, 20, 90, 0.45), inset 0 -6px 10px rgba(0, 20, 120, 0.4); filter: brightness(1.12); }
 
 /* ---------- start menu ---------- */
 .scrim { position: fixed; inset: 0; z-index: 40; }
 .start-menu {
-  position: fixed; left: 8px; bottom: 52px; z-index: 50; width: min(460px, calc(100vw - 16px)); height: min(480px, calc(100vh - 80px)); display: flex;
+  position: fixed; left: 16px; bottom: 84px; z-index: 50; width: min(460px, calc(100vw - 32px)); height: min(480px, calc(100vh - 110px)); display: flex;
   padding: 6px; border-radius: 10px; background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.24));
   backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5);
   border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 0 0 1px rgba(0, 20, 90, 0.55), 0 16px 40px rgba(0, 20, 90, 0.55);
@@ -304,9 +274,9 @@ select { padding: 4px 8px; border: 2px solid var(--cobalt); border-radius: 8px; 
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 860px) {
-  .desk { padding: 8px 8px 58px; }
-  .window-body { flex-direction: column; }
-  .side { flex: none; flex-direction: row; flex-wrap: wrap; gap: 12px; max-height: 38%; }
+  .desk { padding: 8px; }
+  .workspace { flex-direction: column; padding-bottom: 64px; }
+  .side { margin-bottom: 0; flex: none; flex-direction: row; flex-wrap: wrap; gap: 12px; max-height: 38%; }
   .side > * { flex: 1 1 200px; }
   .focus, .shortcuts { display: none; }
   .chips { display: none; }
@@ -330,7 +300,7 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .grip { cursor: grab; }
 
 /* ---------- action animations ---------- */
-button, .card, .shortcuts button, .tabs button, .start-list button { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+button, .card, .shortcuts button, .start-list button { transition: transform 0.12s ease, background-color 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
 button:active:not(:disabled) { transform: scale(0.96); }
 .card:active { transform: none; }
 

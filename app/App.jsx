@@ -179,20 +179,6 @@ function Orb() {
   );
 }
 
-function Clock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 15000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="clock">
-      <b>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b>
-      <span>{now.toLocaleDateString()}</span>
-    </div>
-  );
-}
-
 // Column counter. When the column has a work-in-progress limit it reads "2/3"
 // and turns red once exceeded. Clicking it opens a small editor for the limit.
 function WipBadge({ col, onSet }) {
@@ -1064,183 +1050,171 @@ export default function App() {
           style={{ backgroundImage: `url(/api/background?v=${board.background})` }}
         />
       )}
-      <div className="window">
-        <div className="titlebar">
-          <span className="app-icon"><Orb /></span>
-          <span className="app-title">KanFlash</span>
-          {error && <button className="error" onClick={() => setError('')}>{error} ✕</button>}
-          <div className="chips">
-            <span className="chip"><i className="coin blue" />Cards <b key={stats.total} className="bump">{stats.total}</b></span>
-            <span className="chip"><i className="coin pink" />Columns <b key={board.columns.length} className="bump">{board.columns.length}</b></span>
+      <header className="titlebar">
+        <span className="app-icon"><Orb /></span>
+        <span className="app-title">KanFlash</span>
+        {error && <button className="error" onClick={() => setError('')}>{error} ✕</button>}
+        <div className="chips">
+          <span className="chip"><i className="coin blue" />Cards <b key={stats.total} className="bump">{stats.total}</b></span>
+          <span className="chip"><i className="coin pink" />Columns <b key={board.columns.length} className="bump">{board.columns.length}</b></span>
+        </div>
+        <button className="tb-btn" title="Change background" aria-label="Change background" onClick={() => setBgOpen(true)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2" />
+            <circle cx="9" cy="10" r="1.8" fill="currentColor" />
+            <path d="M4 18l5.5-5.5 3.5 3.5 2.5-2.5L20 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </header>
+
+      <div className="workspace">
+        <aside className="side">
+          <div className="profile">
+            <span className="avatar"><Orb /></span>
+            <div className="profile-name">
+              <Field value={board.name} aria-label="Board name" onCommit={(v) => v.trim() && update((b) => (b.name = v.trim()))} />
+              <span className="pencil" aria-hidden="true">✎</span>
+            </div>
           </div>
-          <button className="tb-btn" title="Change background" aria-label="Change background" onClick={() => setBgOpen(true)}>
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" strokeWidth="2" />
-              <circle cx="9" cy="10" r="1.8" fill="currentColor" />
-              <path d="M4 18l5.5-5.5 3.5 3.5 2.5-2.5L20 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
 
-        <div className="window-body">
-          <aside className="side">
-            <div className="profile">
-              <span className="avatar"><Orb /></span>
-              <div className="profile-name">
-                <Field value={board.name} aria-label="Board name" onCommit={(v) => v.trim() && update((b) => (b.name = v.trim()))} />
-                <span className="pencil" aria-hidden="true">✎</span>
-              </div>
-            </div>
+          <Meter label="Cards done" big={stats.doneCards} value={stats.doneCards} max={stats.total} color="pink" />
+          <Meter label="Checklist items" big={stats.itemsDone} value={stats.itemsDone} max={stats.items} color="green" />
 
-            <Meter label="Cards done" big={stats.doneCards} value={stats.doneCards} max={stats.total} color="pink" />
-            <Meter label="Checklist items" big={stats.itemsDone} value={stats.itemsDone} max={stats.items} color="green" />
+          <div className="focus">
+            <div className="sticker-tab">In focus</div>
+            {stats.doing ? (
+              <button key={stats.doing.id} className="focus-card swap" onClick={() => setOpenCard(stats.doing.id)}>
+                <span className="focus-icon">☰</span>
+                <span>
+                  <b>{stats.doing.title}</b>
+                  {stats.doing.checklist.length > 0 && (
+                    <small>{stats.doing.checklist.filter((i) => i.done).length} of {stats.doing.checklist.length} items done</small>
+                  )}
+                </span>
+              </button>
+            ) : (
+              <p className="focus-empty">
+                Nothing in progress. Drag a card to “{board.columns[1]?.title || 'the second column'}”.
+              </p>
+            )}
+          </div>
 
-            <div className="focus">
-              <div className="sticker-tab">In focus</div>
-              {stats.doing ? (
-                <button key={stats.doing.id} className="focus-card swap" onClick={() => setOpenCard(stats.doing.id)}>
-                  <span className="focus-icon">☰</span>
-                  <span>
-                    <b>{stats.doing.title}</b>
-                    {stats.doing.checklist.length > 0 && (
-                      <small>{stats.doing.checklist.filter((i) => i.done).length} of {stats.doing.checklist.length} items done</small>
-                    )}
-                  </span>
-                </button>
-              ) : (
-                <p className="focus-empty">
-                  Nothing in progress. Drag a card to “{board.columns[1]?.title || 'the second column'}”.
-                </p>
-              )}
-            </div>
+          <nav className="shortcuts" aria-label="Columns">
+            {board.columns.map((col, i) => (
+              <button key={col.id} onClick={() => jumpTo(col.id)}>
+                <span className={'dot ' + tone(i)} />
+                <span className="grow">{col.title}</span>
+                <span key={col.cards.length} className={'num bump' + (col.wip && col.cards.length > col.wip ? ' over' : '')}>{col.cards.length}{col.wip ? `/${col.wip}` : ''}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
 
-            <nav className="shortcuts" aria-label="Columns">
-              {board.columns.map((col, i) => (
-                <button key={col.id} onClick={() => jumpTo(col.id)}>
-                  <span className={'dot ' + tone(i)} />
-                  <span className="grow">{col.title}</span>
-                  <span key={col.cards.length} className={'num bump' + (col.wip && col.cards.length > col.wip ? ' over' : '')}>{col.cards.length}{col.wip ? `/${col.wip}` : ''}</span>
-                </button>
-              ))}
-            </nav>
-          </aside>
-
-          <main ref={mainRef}>
-            {colsView.map((col, vi) => {
-              const ci = board.columns.indexOf(col);
-              const list = col.cards.filter((k) => k.id !== draggedCard);
-              const slotHere = over?.type === 'card' && over.col === col.id;
-              return (
-                <React.Fragment key={col.id}>
-                  {over?.type === 'col' && over.index === vi && colSlot}
-                  <section
-                    id={'col-' + col.id}
-                    data-col={col.id}
-                    data-flip={'col-' + col.id}
-                    className={'column ' + tone(ci) + (focusCol === col.id ? ' focused' : '')}
-                    onAnimationEnd={(e) => e.animationName === 'glow' && setFocusCol(null)}
-                  >
-                    <div className="col-head" onPointerDown={(e) => press(e, 'col', col.id)}>
-                      <span className="grip" title="Drag to move the column">⠿</span>
-                      <Field
-                        className="col-title"
-                        value={col.title}
-                        aria-label="Column name"
-                        onCommit={(v) => v.trim() && update((b) => (b.columns.find((c) => c.id === col.id).title = v.trim()))}
-                      />
-                      <WipBadge col={col} onSet={(n) => update((b) => (b.columns.find((c) => c.id === col.id).wip = n))} />
-                      <button
-                        className="x"
-                        title="Delete column"
-                        onClick={() => {
-                          if (col.cards.length && !confirm(`Delete the column "${col.title}" and its ${col.cards.length} cards?`)) return;
-                          update((b) => (b.columns = b.columns.filter((c) => c.id !== col.id)));
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    <div className="cards">
-                      {list.map((card, i) => {
-                        const done = card.checklist.filter((x) => x.done).length;
-                        return (
-                          <React.Fragment key={card.id}>
-                            {slotHere && over.index === i && cardSlot}
-                            <article
-                              className="card"
-                              data-flip={'card-' + card.id}
-                              tabIndex={0}
-                              onPointerDown={(e) => press(e, 'card', card.id)}
-                              onClick={() => !suppressClick.current && setOpenCard(card.id)}
-                              onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && setOpenCard(card.id)}
-                            >
-                              <div className="card-title">{card.title}</div>
-                              <div className="card-meta">
-                                {card.priority && <span className={'prio-badge ' + card.priority}>{PRIORITY_LABEL[card.priority]}</span>}
-                                <span>#{card.id}</span>
-                                {card.description && <span title="Has a description">☰</span>}
-                                {card.checklist.length > 0 && (
-                                  <span className={'mini' + (done === card.checklist.length ? ' all' : '')}>
-                                    <span className="mini-bar"><i style={{ width: (done / card.checklist.length) * 100 + '%' }} /></span>
-                                    {done}/{card.checklist.length}
-                                  </span>
-                                )}
-                              </div>
-                            </article>
-                          </React.Fragment>
-                        );
-                      })}
-                      {slotHere && over.index >= list.length && cardSlot}
-                      {!list.length && !slotHere && <p className="col-empty">Drop a card here</p>}
-                    </div>
-
-                    <AddInline
-                      label="Add card"
-                      placeholder="Card title (Enter)"
-                      onAdd={(title) =>
-                        update((b) => {
-                          const now = new Date().toISOString();
-                          b.columns.find((c) => c.id === col.id).cards.push({
-                            id: b.nextId++, title, description: '', checklist: [], createdAt: now, updatedAt: now,
-                          });
-                        })
-                      }
+        <main ref={mainRef}>
+          {colsView.map((col, vi) => {
+            const ci = board.columns.indexOf(col);
+            const list = col.cards.filter((k) => k.id !== draggedCard);
+            const slotHere = over?.type === 'card' && over.col === col.id;
+            return (
+              <React.Fragment key={col.id}>
+                {over?.type === 'col' && over.index === vi && colSlot}
+                <section
+                  id={'col-' + col.id}
+                  data-col={col.id}
+                  data-flip={'col-' + col.id}
+                  className={'column ' + tone(ci) + (focusCol === col.id ? ' focused' : '')}
+                  onAnimationEnd={(e) => e.animationName === 'glow' && setFocusCol(null)}
+                >
+                  <div className="col-head" onPointerDown={(e) => press(e, 'col', col.id)}>
+                    <span className="grip" title="Drag to move the column">⠿</span>
+                    <Field
+                      className="col-title"
+                      value={col.title}
+                      aria-label="Column name"
+                      onCommit={(v) => v.trim() && update((b) => (b.columns.find((c) => c.id === col.id).title = v.trim()))}
                     />
-                  </section>
-                </React.Fragment>
-              );
-            })}
-            {over?.type === 'col' && over.index >= colsView.length && colSlot}
+                    <WipBadge col={col} onSet={(n) => update((b) => (b.columns.find((c) => c.id === col.id).wip = n))} />
+                    <button
+                      className="x"
+                      title="Delete column"
+                      onClick={() => {
+                        if (col.cards.length && !confirm(`Delete the column "${col.title}" and its ${col.cards.length} cards?`)) return;
+                        update((b) => (b.columns = b.columns.filter((c) => c.id !== col.id)));
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
 
-            <div className="column new-col">
-              <AddInline
-                label="Add column"
-                placeholder="Column name (Enter)"
-                onAdd={(title) =>
-                  update((b) => {
-                    b.columns.push({ id: 'c' + Math.random().toString(36).slice(2, 7), title, cards: [] });
-                  })
-                }
-              />
-            </div>
-          </main>
-        </div>
+                  <div className="cards">
+                    {list.map((card, i) => {
+                      const done = card.checklist.filter((x) => x.done).length;
+                      return (
+                        <React.Fragment key={card.id}>
+                          {slotHere && over.index === i && cardSlot}
+                          <article
+                            className="card"
+                            data-flip={'card-' + card.id}
+                            tabIndex={0}
+                            onPointerDown={(e) => press(e, 'card', card.id)}
+                            onClick={() => !suppressClick.current && setOpenCard(card.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && setOpenCard(card.id)}
+                          >
+                            <div className="card-title">{card.title}</div>
+                            <div className="card-meta">
+                              {card.priority && <span className={'prio-badge ' + card.priority}>{PRIORITY_LABEL[card.priority]}</span>}
+                              <span>#{card.id}</span>
+                              {card.description && <span title="Has a description">☰</span>}
+                              {card.checklist.length > 0 && (
+                                <span className={'mini' + (done === card.checklist.length ? ' all' : '')}>
+                                  <span className="mini-bar"><i style={{ width: (done / card.checklist.length) * 100 + '%' }} /></span>
+                                  {done}/{card.checklist.length}
+                                </span>
+                              )}
+                            </div>
+                          </article>
+                        </React.Fragment>
+                      );
+                    })}
+                    {slotHere && over.index >= list.length && cardSlot}
+                    {!list.length && !slotHere && <p className="col-empty">Drop a card here</p>}
+                  </div>
+
+                  <AddInline
+                    label="Add card"
+                    placeholder="Card title (Enter)"
+                    onAdd={(title) =>
+                      update((b) => {
+                        const now = new Date().toISOString();
+                        b.columns.find((c) => c.id === col.id).cards.push({
+                          id: b.nextId++, title, description: '', checklist: [], createdAt: now, updatedAt: now,
+                        });
+                      })
+                    }
+                  />
+                </section>
+              </React.Fragment>
+            );
+          })}
+          {over?.type === 'col' && over.index >= colsView.length && colSlot}
+
+          <div className="column new-col">
+            <AddInline
+              label="Add column"
+              placeholder="Column name (Enter)"
+              onAdd={(title) =>
+                update((b) => {
+                  b.columns.push({ id: 'c' + Math.random().toString(36).slice(2, 7), title, cards: [] });
+                })
+              }
+            />
+          </div>
+        </main>
       </div>
 
-      <footer className="taskbar">
-        <button className={'orb' + (menu ? ' open' : '')} onClick={() => setMenu((m) => !m)} aria-label="Open menu" aria-expanded={menu}>
-          <Orb />
-        </button>
-        <nav className="tabs" aria-label="Jump to column">
-          {board.columns.map((col) => (
-            <button key={col.id} className={focusCol === col.id ? 'active' : ''} onClick={() => jumpTo(col.id)}>
-              {col.title}
-            </button>
-          ))}
-        </nav>
-        <Clock />
-      </footer>
+      <button className={'orb' + (menu ? ' open' : '')} onClick={() => setMenu((m) => !m)} aria-label="Open menu" aria-expanded={menu}>
+        <Orb />
+      </button>
 
       {menu && (
         <StartMenu
