@@ -14,7 +14,7 @@ import {
 const HELP = `KanFlash - a kanban board for you and your AI
 
 Read
-  kanflash list [--col <column>] [--json]     show the board
+  kanflash list [--col <column>] [--all] [--json]   show the board (the last column shows only its 3 newest cards unless --all)
   kanflash show <id> [--json]                 show one card in full
   kanflash next                               the card to pick up next (highest priority in the 1st column)
 
@@ -73,14 +73,57 @@ function cardLine(c) {
   return `#${c.id}${prio} ${c.title}${total ? `  [${done}/${total}]` : ''}${c.description ? '  …' : ''}`;
 }
 
-function printBoard(board, only) {
+const DONE_SHOWN = 3;
+
+function printBoard(board, only, all) {
   console.log(`# ${board.name}`);
   const cols = only ? [findColumn(board, only)] : board.columns;
   for (const col of cols) {
+    const last = col === board.columns[board.columns.length - 1] && board.columns.length > 1;
+    const hidden = last && !only && !all ? Math.max(0, col.cards.length - DONE_SHOWN) : 0;
     const limit = col.wip ? `/${col.wip}${col.cards.length > col.wip ? ', over the limit' : ''}` : '';
     console.log(`\n## ${col.title} (${col.cards.length}${limit})`);
     if (!col.cards.length) console.log('  (empty)');
-    for (const c of col.cards) console.log('  ' + cardLine(c));
+    if (hidden) console.log(`  (+${hidden} older, use --all)`);
+    for (const c of col.cards.slice(hidden)) console.log('  ' + cardLine(c));
+  }
+}
+
+// ---- Claude Code hooks (see scripts/setup.js) ----
+const STAMP = path.join(path.dirname(BOARD_FILE), '.prompt-stamp');
+
+function readStdin() {
+  try {
+    return JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function runHook(kind, board) {
+  const doing = board.columns.length > 1 ? board.columns[1].cards : [];
+  const brief = (c) => `#${c.id} ${c.title}${c.checklist.length ? ` [${c.checklist.filter((i) => i.done).length}/${c.checklist.length}]` : ''}`;
+  if (kind === 'prompt') {
+    try { fs.writeFileSync(STAMP, String(Date.now())); } catch {}
+    const nxt = nextCard(board);
+    const parts = [];
+    if (doing.length) parts.push(`In progress: ${doing.map(brief).join('; ')}`);
+    if (nxt) parts.push(`Next: ${brief(nxt.card)}`);
+    console.log(`[KanFlash] ${parts.join(' | ') || 'board empty'}. Keep the board in sync (start/check/done).`);
+    return;
+  }
+  if (kind === 'stop') {
+    const input = readStdin();
+    if (input.stop_hook_active || !doing.length) return; // never loop; nothing open
+    let stamp = 0;
+    try { stamp = Number(fs.readFileSync(STAMP, 'utf8')); } catch {}
+    let touched = false;
+    try { touched = fs.statSync(BOARD_FILE).mtimeMs > stamp; } catch {}
+    if (touched) return; // the board changed during this turn
+    console.log(JSON.stringify({
+      decision: 'block',
+      reason: `KanFlash: ${doing.map(brief).join('; ')} is still in progress and the board was not updated this turn. If you did work on it, update it now (check items, done, or edit). If this turn was unrelated, just stop.`,
+    }));
   }
 }
 
@@ -130,11 +173,13 @@ async function main() {
   const board = loadBoard();
   const save = () => saveBoard(board);
 
+  if (cmd === 'hook') return runHook(pos[0], board);
+
   switch (cmd) {
     case 'list':
     case 'ls':
       if (flags.json) return console.log(JSON.stringify(board, null, 2));
-      return printBoard(board, str(flags.col) || undefined);
+      return printBoard(board, str(flags.col) || undefined, !!flags.all);
 
     case 'show': {
       const { card, col } = findCard(board, need(pos[0], 'Usage: kanflash show <id>'));

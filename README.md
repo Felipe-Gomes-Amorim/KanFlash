@@ -21,12 +21,12 @@ node .kanflash/scripts/setup.js
 
 `setup`:
 
-- installs dependencies and builds the site;
+- uses the prebuilt site in `dist/` (no `npm install`, no `node_modules`: about 0.5 MB on disk);
 - hides `.kanflash/` from the project's git using `.git/info/exclude` (a **local** rule, nothing is pushed to the project's remote);
 - writes instructions for the AI to `CLAUDE.local.md` (also hidden), so it reviews the board before working and updates it afterwards;
-- adds a `SessionStart` hook to `.claude/settings.local.json` so Claude Code sees the board as soon as a session opens.
+- adds three Claude Code hooks to `.claude/settings.local.json`: `SessionStart` (shows the board), `UserPromptSubmit` (a one-line reminder with the card in progress and the next one, about 40 tokens per message) and `Stop` (nudges once if a card is still in progress and the board was not touched during the turn).
 
-Options: `--file AGENTS.md` (another instructions file, e.g. for Codex or Cursor), `--shared` (write to the tracked `AGENTS.md`/`CLAUDE.md` instead), `--no-hook`, `--no-build`.
+Options: `--file AGENTS.md` (another instructions file, e.g. for Codex or Cursor), `--shared` (write to the tracked `AGENTS.md`/`CLAUDE.md` instead), `--no-hook`, `--build` (force a rebuild).
 
 No `degit`? `git clone --depth 1 https://github.com/Felipe-Gomes-Amorim/KanFlash .kanflash && rm -rf .kanflash/.git` does the same.
 
@@ -36,7 +36,7 @@ No `degit`? `git clone --depth 1 https://github.com/Felipe-Gomes-Amorim/KanFlash
 node .kanflash/bin/kanflash.js update
 ```
 
-This downloads the latest version over the installed one, rebuilds the site and refreshes the AI instructions. Your board (`data/board.json`) and background are kept. Restart the server afterwards if it was running.
+This downloads the latest version over the installed one and refreshes the AI instructions. Your board (`data/board.json`) and background are kept. Restart the server afterwards if it was running.
 
 ## Use
 
@@ -63,7 +63,8 @@ Each project gets its own `data/board.json` (and `data/background.jpg` if you se
 
 ```bash
 npm install
-npm run build && npm start     # production build on :4545
+npm run build                  # dist/ is committed: rebuild and commit it after UI changes
+npm start                      # serve on :4545
 npm run dev                    # Vite with hot reload (run the server in another terminal)
 ```
 

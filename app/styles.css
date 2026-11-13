@@ -1,5 +1,9 @@
 /* KanFlash: Aero glass (Windows 7) + game-UI panels in cobalt blue and pink */
 
+/* fonts: bundled woff2 only (M PLUS Rounded 1c, latin subset, SIL OFL) */
+@font-face { font-family: 'M PLUS Rounded 1c'; font-weight: 700; font-display: swap; src: url('./fonts/m-plus-rounded-1c-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'M PLUS Rounded 1c'; font-weight: 800; font-display: swap; src: url('./fonts/m-plus-rounded-1c-latin-800-normal.woff2') format('woff2'); }
+
 :root {
   --sky-1: #8fd8ff;
   --sky-2: #2f86e8;

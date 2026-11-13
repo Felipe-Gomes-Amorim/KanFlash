@@ -3,11 +3,11 @@
 //
 //   node .kanflash/scripts/setup.js [--file <name>] [--shared] [--no-hook] [--no-build]
 //
-// - installs dependencies and builds the site
+// - uses the prebuilt site in dist/ (builds it only when dist/ is missing, e.g. in a development clone)
 // - hides .kanflash/ (and generated files) from the project's git via .git/info/exclude
 //   (a local-only rule: nothing is pushed to the project's remote)
 // - writes the AI instructions to CLAUDE.local.md (or --file, or --shared for the tracked AGENTS.md/CLAUDE.md)
-// - adds a Claude Code SessionStart hook that prints the board when a session opens
+// - adds Claude Code hooks: SessionStart (prints the board), UserPromptSubmit (one-line reminder), Stop (nudges if a card was left stale)
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -29,10 +29,9 @@ if (path.basename(ROOT) === 'KanFlash' && !has('--force')) {
 }
 
 // 1. build
-if (!has('--no-build')) {
+if (!has('--no-build') && (has('--build') || !fs.existsSync(path.join(ROOT, 'dist', 'index.html')))) {
   // one command string + shell: works on Windows (npm.cmd) without Node's args-with-shell warning
   const run = (a) => spawnSync(`npm ${a.join(' ')}`, { cwd: ROOT, stdio: 'inherit', shell: true });
-  // always rebuild: on an update the dependencies and the site may have changed
   log('Installing dependencies…');
   if (run(['install', '--no-audit', '--no-fund']).status !== 0) process.exit(1);
   log('Building the site…');
@@ -78,15 +77,24 @@ if (!has('--no-hook')) {
   try {
     settings = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch {}
-  const command = `${cli} list`;
   settings.hooks ||= {};
-  const list = (settings.hooks.SessionStart ||= []);
-  const already = list.some((g) => g.hooks?.some((h) => h.command === command));
-  if (!already) {
-    list.push({ hooks: [{ type: 'command', command }] });
+  const wanted = [
+    ['SessionStart', `${cli} list`],
+    ['UserPromptSubmit', `${cli} hook prompt`],
+    ['Stop', `${cli} hook stop`],
+  ];
+  let changed = false;
+  for (const [event, command] of wanted) {
+    const list = (settings.hooks[event] ||= []);
+    if (!list.some((g) => g.hooks?.some((h) => h.command === command))) {
+      list.push({ hooks: [{ type: 'command', command }] });
+      changed = true;
+    }
+  }
+  if (changed) {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
-    log('Added a SessionStart hook to .claude/settings.local.json (Claude Code will see the board on startup).');
+    log('Added Claude Code hooks to .claude/settings.local.json (board on startup, reminder per message, stale-card nudge).');
   }
   excludes.push('.claude/settings.local.json');
 }
