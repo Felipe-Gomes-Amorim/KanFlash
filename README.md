@@ -3,12 +3,50 @@
 A local kanban board for your projects, editable by you (in the browser) and by your project's AI (through a CLI).
 Everything lives in a single `board.json` file: no database, no external service.
 
-- **Web UI**: columns, drag & drop for cards and columns, card descriptions and checklists, search. Styled after Windows 7 Aero glass.
-- **Light agile built in** (all optional, no team required): MoSCoW priorities on cards, work-in-progress limits on columns, and `kanflash next` to pick the right card.
-- **Custom background**: pick any image and crop it (screen, 16:9, 21:9, 4:3 or free ratio) before it is applied.
-- **CLI**: `kanflash add`, `move`, `done`, `check`… so an AI agent can read and update the board while it works.
-- **Drops into any project** as a hidden folder that never reaches the project's remote.
-- **Live sync**: the page updates by itself when the board file changes, and the other way around.
+## What it does
+
+### For you
+
+- **Board in the browser**: columns, drag & drop for cards and columns (cards float under the mouse while you drag), descriptions, checklists with progress bars, search. Styled after Windows 7 Aero glass with a game-UI feel.
+- **Light agile, no team needed**: MoSCoW priorities on cards (must / should / could / won't), work-in-progress limits on columns, and `kanflash next` to pick the right card.
+- **Your own wallpaper**: pick an image and crop it (screen, 16:9, 21:9, 4:3 or free ratio).
+- **Live sync**: the page updates by itself when the AI changes the board, and the other way around.
+- **Invisible to the project**: lives in a hidden `.kanflash/` folder that never reaches the project's remote, about 0.5 MB on disk, no `node_modules`.
+
+### For your AI
+
+- **Reads the board before working**: a session-start hook prints the board, and a one-line reminder keeps it in mind (sent when it changes, otherwise every 5th message).
+- **Updates it as it goes**: `start`, `check`, `done`, `add`, `edit`, `move`... through a CLI with short outputs.
+- **Picks what to do next**: `kanflash next` returns the highest-priority card in the first column, so you never have to answer "what's next?" again.
+- **Respects your limits**: it refuses to move a card into a full column (WIP limit) unless it is told to force it.
+- **Gets nudged when it forgets**: if a card is still in progress and the board was not touched during a turn, a `Stop` hook asks the AI once to update it (never loops, optional with `--no-stop`).
+- **Any AI that reads an instructions file**: Claude Code gets hooks; for Codex, Cursor and others use `--file AGENTS.md`.
+
+## Token savings
+
+A board is memory the AI does not have to rebuild. Without one, every "what's next?" makes the AI reread git history and files; with one, it reads about 100 tokens.
+
+The cost of KanFlash itself is small and measured from the real output sizes:
+
+| Item | Size |
+| --- | --- |
+| AI instructions (once per session) | ~260 tokens |
+| Board at session start (`list`) | ~60-150 tokens (the last column shows only its 3 newest cards) |
+| Per-message reminder | ~40 tokens, and only when it changes or every 5th message |
+| A typical task (`list`, `start`, a few `check`, `done`) | ~600 tokens |
+
+Estimated total for a small project (120 messages, 25 tasks, 10 sessions), median of 20,000 simulated runs:
+
+| How you work | Tokens | With KanFlash |
+| --- | --- | --- |
+| 1. Forget the next step, ask the AI every time | ~201k | **-63%** |
+| 2. Review the next step with the AI every 5 messages | ~185k | **-60%** |
+| 3. Never ask, no board | ~178k | **-58%** |
+| 4. Use KanFlash and never ask | **~73k** | |
+
+KanFlash itself costs about 38k of those 73k (roughly 320 tokens per message). The rest of the saving comes from cheaper "what's next?" answers (scenarios 1 and 2) and from less rework when the AI knows what is done and what is a priority (scenario 3).
+
+**These are estimates, not measurements.** The KanFlash overhead is solid, but the benefits rest on assumptions: that rebuilding the project state without a board costs about 4k tokens (range 2k-9k), and that the AI goes in the wrong direction on about 25% of tasks without a board and about 6% with one. If the question costs less than ~1.5k tokens, scenario 1 breaks even, and in a tiny or one-session project the fixed overhead may not pay off. You can change every assumption in [`docs/cost-model.py`](docs/cost-model.py) and rerun it, or compare the `/cost` of the same task in a project with and without KanFlash.
 
 ## Install into a project
 
