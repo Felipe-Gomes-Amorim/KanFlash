@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Sets KanFlash up inside a project (this folder must live at <project>/.kanflash).
 //
-//   node .kanflash/scripts/setup.js [--file <name>] [--shared] [--no-hook] [--no-build]
+//   node .kanflash/scripts/setup.js [--file <name>] [--shared] [--no-hook] [--no-stop] [--build]
 //
 // - uses the prebuilt site in dist/ (builds it only when dist/ is missing, e.g. in a development clone)
 // - hides .kanflash/ (and generated files) from the project's git via .git/info/exclude
@@ -81,7 +81,7 @@ if (!has('--no-hook')) {
   const wanted = [
     ['SessionStart', `${cli} list`],
     ['UserPromptSubmit', `${cli} hook prompt`],
-    ['Stop', `${cli} hook stop`],
+    ...(has('--no-stop') ? [] : [['Stop', `${cli} hook stop`]]),
   ];
   let changed = false;
   for (const [event, command] of wanted) {
