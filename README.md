@@ -24,7 +24,7 @@ node .kanflash/scripts/setup.js
 - uses the prebuilt site in `dist/` (no `npm install`, no `node_modules`: about 0.5 MB on disk);
 - hides `.kanflash/` from the project's git using `.git/info/exclude` (a **local** rule, nothing is pushed to the project's remote);
 - writes instructions for the AI to `CLAUDE.local.md` (also hidden), so it reviews the board before working and updates it afterwards;
-- adds three Claude Code hooks to `.claude/settings.local.json`: `SessionStart` (shows the board), `UserPromptSubmit` (a one-line reminder with the card in progress and the next one, about 40 tokens per message) and `Stop` (nudges once if a card is still in progress and the board was not touched during the turn).
+- adds three Claude Code hooks to `.claude/settings.local.json`: `SessionStart` (shows the board), `UserPromptSubmit` (a one-line reminder with the card in progress and the next one, about 40 tokens; sent when that changes and otherwise every 5th message) and `Stop` (nudges once if a card is still in progress and the board was not touched during the turn).
 
 Options: `--file AGENTS.md` (another instructions file, e.g. for Codex or Cursor), `--shared` (write to the tracked `AGENTS.md`/`CLAUDE.md` instead), `--no-hook` (no hooks at all), `--no-stop` (skip only the `Stop` nudge), `--build` (force a rebuild).
 

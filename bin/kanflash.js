@@ -91,6 +91,8 @@ function printBoard(board, only, all) {
 
 // ---- Claude Code hooks (see scripts/setup.js) ----
 const STAMP = path.join(path.dirname(BOARD_FILE), '.prompt-stamp');
+const STATE = path.join(path.dirname(BOARD_FILE), '.prompt-state');
+const REMIND_EVERY = 5;
 
 function readStdin() {
   try {
@@ -109,7 +111,13 @@ function runHook(kind, board) {
     const parts = [];
     if (doing.length) parts.push(`In progress: ${doing.map(brief).join('; ')}`);
     if (nxt) parts.push(`Next: ${brief(nxt.card)}`);
-    console.log(`[KanFlash] ${parts.join(' | ') || 'board empty'}. Keep the board in sync (start/check/done).`);
+    const line = `[KanFlash] ${parts.join(' | ') || 'board empty'}. Keep the board in sync (start/check/done).`;
+    // Stay quiet while nothing changed, but repeat every REMIND_EVERY messages so the AI does not forget the board.
+    let state = {};
+    try { state = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch {}
+    const quiet = state.line === line && (state.quiet || 0) + 1 < REMIND_EVERY;
+    try { fs.writeFileSync(STATE, JSON.stringify({ line, quiet: quiet ? state.quiet + 1 : 0 })); } catch {}
+    if (!quiet) console.log(line);
     return;
   }
   if (kind === 'stop') {
