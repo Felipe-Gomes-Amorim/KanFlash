@@ -1,4 +1,5 @@
-<img width="2012" height="782" alt="kanflash banner" src="https://github.com/user-attachments/assets/727357fc-fb1e-4be4-9471-8e400750d701" />
+<img width="2012" height="782" alt="kanflash-banner" src="https://github.com/user-attachments/assets/e7c25445-8e3d-4575-94ab-a7a5d12bed03" />
+
 
 
 
