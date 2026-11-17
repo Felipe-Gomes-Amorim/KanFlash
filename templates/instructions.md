@@ -5,7 +5,7 @@
 1. **Before work**: `{{CLI}} list` (or `next` if no task was named). Reuse a matching card; otherwise `add "title" --priority should --check "step"`.
 2. **Start**: `start <id>` (moves to the 2nd column). If the column is full (WIP limit), finish something first; never use `--force` unless told to.
 3. **During**: `check <id> <item#>` right after each step; new work becomes `add` / `add-item`.
-4. **Finish**: `done <id>`. If incomplete, leave it in progress and note what is left in `edit <id> --desc`.
+4. **Finish**: `done <id>` (moves it to the column named "Done"; if the board has none, use `move <id> <column>`). If incomplete, leave it in progress and note what is left in `edit <id> --desc`.
 
 Priorities (MoSCoW): `must`, `should`, `could`, `wont`. Never change one the user set. Don't delete cards the user made. Never edit `board.json` by hand.
 

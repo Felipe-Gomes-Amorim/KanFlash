@@ -154,6 +154,9 @@ function AddInline({ placeholder, onAdd, label, className = '' }) {
   );
 }
 
+// A column counts as "Done" when it is named Done (any case). Rename or delete it and the "Cards done" meter goes away.
+const isDone = (col) => col.title.trim().toLowerCase() === 'done';
+
 // Big number + pill bar with the counter inside.
 function Meter({ label, big, value, max, color }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
@@ -247,8 +250,25 @@ function WipBadge({ col, onSet }) {
 
 // ---------- start menu ----------
 
+function Guide({ onBack }) {
+  return (
+    <div className="guide">
+      <div className="start-heading">How to use</div>
+      <ul>
+        <li><b>Cards</b>: drag them between columns. Click one to edit its description, checklist and priority.</li>
+        <li><b>Columns</b>: drag the ⠿ handle to reorder, click a title to rename, click the number to set a work-in-progress limit.</li>
+        <li><b>In focus</b>: the first card of the 2nd column is shown on the left.</li>
+        <li><b>Done</b>: if a column is named “Done”, its progress appears on the left as “Cards done”. Rename or delete it and that meter disappears.</li>
+        <li><b>Your AI</b> edits the same board with the CLI (<code>kanflash help</code>), and this page updates live.</li>
+      </ul>
+      <button className="guide-back" onClick={onBack}>← Back</button>
+    </div>
+  );
+}
+
 function StartMenu({ board, update, reload, onOpenCard, onBackground, onClose }) {
   const [q, setQ] = useState('');
+  const [guide, setGuide] = useState(false);
   useEffect(() => {
     const h = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', h);
@@ -269,6 +289,7 @@ function StartMenu({ board, update, reload, onOpenCard, onBackground, onClose })
       <div className="scrim" onMouseDown={onClose} />
       <div className="start-menu" role="dialog" aria-label="Menu">
         <div className="start-left">
+          {guide ? <Guide onBack={() => setGuide(false)} /> : <>
           <div className="start-heading">{query ? `Results (${list.length})` : 'Recently updated'}</div>
           <ul className="start-list">
             {list.map(({ card, col }) => (
@@ -294,6 +315,7 @@ function StartMenu({ board, update, reload, onOpenCard, onBackground, onClose })
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
+          </>}
         </div>
         <div className="start-right">
           <div className="start-action">
@@ -322,6 +344,9 @@ function StartMenu({ board, update, reload, onOpenCard, onBackground, onClose })
               }}
             />
           </div>
+          <button className="start-btn" onClick={() => setGuide((g) => !g)}>
+            How to use
+          </button>
           <button
             className="start-btn"
             onClick={() => {
@@ -821,8 +846,8 @@ export default function App() {
   const stats = useMemo(() => {
     if (!board) return null;
     const total = board.columns.reduce((n, c) => n + c.cards.length, 0);
-    const last = board.columns[board.columns.length - 1];
-    const doneCards = board.columns.length > 1 && last ? last.cards.length : 0;
+    const doneCol = board.columns.find(isDone);
+    const doneCards = doneCol ? doneCol.cards.length : null; // null: no Done column, so no meter
     let items = 0;
     let itemsDone = 0;
     for (const c of board.columns)
@@ -830,8 +855,9 @@ export default function App() {
         items += k.checklist.length;
         itemsDone += k.checklist.filter((i) => i.done).length;
       }
-    const doing = board.columns[1]?.cards[0] || null;
-    return { total, doneCards, items, itemsDone, doing };
+    const doingCol = board.columns[1] && !isDone(board.columns[1]) ? board.columns[1] : null;
+    const doing = doingCol?.cards[0] || null;
+    return { total, doneCards, items, itemsDone, doing, doingCol };
   }, [board]);
 
   if (!board) return <div className="center">{error || 'Loading…'}</div>;
@@ -1077,8 +1103,8 @@ export default function App() {
             </div>
           </div>
 
-          <Meter label="Cards done" big={stats.doneCards} value={stats.doneCards} max={stats.total} color="pink" />
-          <Meter label="Checklist items" big={stats.itemsDone} value={stats.itemsDone} max={stats.items} color="green" />
+          {stats.doneCards !== null && <Meter label="Cards done" big={stats.doneCards} value={stats.doneCards} max={stats.total} color="pink" />}
+          {stats.items > 0 && <Meter label="Checklist items" big={stats.itemsDone} value={stats.itemsDone} max={stats.items} color="green" />}
 
           <div className="focus">
             <div className="sticker-tab">In focus</div>
@@ -1094,7 +1120,7 @@ export default function App() {
               </button>
             ) : (
               <p className="focus-empty">
-                Nothing in progress. Drag a card to “{board.columns[1]?.title || 'the second column'}”.
+                Nothing in progress.{stats.doingCol ? ` Drag a card to “${stats.doingCol.title}”.` : ''}
               </p>
             )}
           </div>

@@ -136,6 +136,11 @@ export function saveBoard(board, expectedRev) {
 
 const norm = (s) => String(s).trim().toLowerCase();
 
+// The column named "Done" (any case), or null. The board does not require one.
+export function findDoneColumn(board) {
+  return board.columns.find((c) => c.title.trim().toLowerCase() === 'done') || null;
+}
+
 export function findColumn(board, ref) {
   const r = norm(ref);
   const partial = board.columns.filter((c) => norm(c.title).includes(r));

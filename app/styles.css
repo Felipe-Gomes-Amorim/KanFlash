@@ -232,6 +232,12 @@ main { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: flex-start;
 .start-btn:hover, .start-right .add-btn:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.45); }
 .start-right .plus { display: none; }
 .start-right .add-input { margin: 0; }
+.guide { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.guide ul { flex: 1; margin: 0; padding: 0 6px 0 22px; overflow-y: auto; color: var(--ink); font-size: 13px; line-height: 1.4; }
+.guide li { margin-bottom: 8px; }
+.guide code { padding: 0 4px; border-radius: 4px; background: #e6eeff; font-size: 12px; }
+.guide-back { align-self: flex-start; margin-top: 6px; padding: 6px 12px; border: 1px solid #9bb6f2; border-radius: 999px; background: #f5f8ff; color: var(--ink); font: 700 13px var(--display); }
+.guide-back:hover { background: #dce8ff; }
 
 /* ---------- card window ---------- */
 .overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: start center; padding: 6vh 16px; overflow-y: auto; background: rgba(0, 20, 80, 0.4); }

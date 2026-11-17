@@ -36,7 +36,7 @@ The cost of KanFlash itself is small and measured from the real output sizes:
 | Item | Size |
 | --- | --- |
 | AI instructions (once per session) | ~260 tokens |
-| Board at session start (`list`) | ~60-150 tokens (the last column shows only its 3 newest cards) |
+| Board at session start (`list`) | ~60-150 tokens (the Done column shows only its 3 newest cards) |
 | Per-message reminder | ~40 tokens, and only when it changes or every 5th message |
 | A typical task (`list`, `start`, a few `check`, `done`) | ~600 tokens |
 

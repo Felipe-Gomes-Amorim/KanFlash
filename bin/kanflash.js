@@ -7,14 +7,14 @@ import {
   loadBoard, saveBoard, findCard, findColumn,
   addCard, moveCard, editCard, removeCard,
   addItem, setItemDone, removeItem,
-  addColumn, renameColumn, removeColumn, moveColumn, setColumnLimit, nextCard,
+  addColumn, renameColumn, removeColumn, moveColumn, setColumnLimit, nextCard, findDoneColumn,
   PRIORITY_LABEL, BOARD_FILE, ROOT,
 } from '../core/board.js';
 
 const HELP = `KanFlash - a kanban board for you and your AI
 
 Read
-  kanflash list [--col <column>] [--all] [--json]   show the board (the last column shows only its 3 newest cards unless --all)
+  kanflash list [--col <column>] [--all] [--json]   show the board (the Done column shows only its 3 newest cards unless --all)
   kanflash show <id> [--json]                 show one card in full
   kanflash next                               the card to pick up next (highest priority in the 1st column)
 
@@ -22,7 +22,7 @@ Cards
   kanflash add "title" [--col <column>] [--desc "text"] [--check "item"]... [--priority <p>]
   kanflash move <id> <column> [--pos <n>] [--force]   (pos starts at 1)
   kanflash start <id> [--force]               move to the 2nd column
-  kanflash done <id>                          move to the last column
+  kanflash done <id>                          move to the column named "Done"
   kanflash edit <id> [--title "new"] [--desc "new"] [--priority <p>|none]
   kanflash rm <id>
 
@@ -79,8 +79,7 @@ function printBoard(board, only, all) {
   console.log(`# ${board.name}`);
   const cols = only ? [findColumn(board, only)] : board.columns;
   for (const col of cols) {
-    const last = col === board.columns[board.columns.length - 1] && board.columns.length > 1;
-    const hidden = last && !only && !all ? Math.max(0, col.cards.length - DONE_SHOWN) : 0;
+    const hidden = col === findDoneColumn(board) && !only && !all ? Math.max(0, col.cards.length - DONE_SHOWN) : 0;
     const limit = col.wip ? `/${col.wip}${col.cards.length > col.wip ? ', over the limit' : ''}` : '';
     console.log(`\n## ${col.title} (${col.cards.length}${limit})`);
     if (!col.cards.length) console.log('  (empty)');
@@ -103,7 +102,7 @@ function readStdin() {
 }
 
 function runHook(kind, board) {
-  const doing = board.columns.length > 1 ? board.columns[1].cards : [];
+  const doing = board.columns.length > 1 && board.columns[1] !== findDoneColumn(board) ? board.columns[1].cards : [];
   const brief = (c) => `#${c.id} ${c.title}${c.checklist.length ? ` [${c.checklist.filter((i) => i.done).length}/${c.checklist.length}]` : ''}`;
   if (kind === 'prompt') {
     try { fs.writeFileSync(STAMP, String(Date.now())); } catch {}
@@ -222,8 +221,9 @@ async function main() {
 
     case 'start':
     case 'done': {
-      const target = cmd === 'start' ? board.columns[1] : board.columns[board.columns.length - 1];
-      if (!target) throw new Error('The target column does not exist.');
+      const target = cmd === 'start' ? board.columns[1] : findDoneColumn(board);
+      if (cmd === 'done' && !target) throw new Error('This board has no column named "Done". Use "move <id> <column>" instead.');
+      if (!target || (cmd === 'start' && target === findDoneColumn(board))) throw new Error('There is no in-progress column (the 2nd column).');
       const r = moveCard(board, need(pos[0], `Usage: kanflash ${cmd} <id>`), target.id, undefined, { force: !!flags.force });
       save();
       return console.log(`#${r.card.id} moved: "${r.from.title}" → "${r.to.title}"`);
