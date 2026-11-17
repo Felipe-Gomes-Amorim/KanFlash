@@ -1,4 +1,8 @@
-# ⚡ KanFlash
+<img width="2012" height="782" alt="kanflash banner" src="https://github.com/user-attachments/assets/727357fc-fb1e-4be4-9471-8e400750d701" />
+
+
+
+# KanFlash
 
 A local kanban board for your projects, editable by you (in the browser) and by your project's AI (through a CLI).
 Everything lives in a single `board.json` file: no database, no external service.
